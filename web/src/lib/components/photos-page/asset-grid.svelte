@@ -7,19 +7,19 @@
   import { locale, showDeleteModal } from '$lib/stores/preferences.store';
   import { isSearchEnabled } from '$lib/stores/search.store';
   import { featureFlags } from '$lib/stores/server-config.store';
-  import { deleteAssets } from '$lib/utils/actions';
+  import { archiveAssets, deleteAssets, favoriteAssets } from '$lib/utils/actions';
   import { type ShortcutOptions, shortcuts } from '$lib/actions/shortcut';
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
   import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
-  import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
-  import Portal from '../shared-components/portal/portal.svelte';
-  import Scrollbar from '../shared-components/scrollbar/scrollbar.svelte';
-  import ShowShortcuts from '../shared-components/show-shortcuts.svelte';
-  import AssetDateGroup from './asset-date-group.svelte';
+  import IntersectionObserver from '$lib/components/asset-viewer/intersection-observer.svelte';
+  import Portal from '$lib/components/shared-components/portal/portal.svelte';
+  import Scrollbar from '$lib/components/shared-components/scrollbar/scrollbar.svelte';
+  import ShowShortcuts from '$lib/components/shared-components/show-shortcuts.svelte';
+  import AssetDateGroup from '$lib/components/photos-page/asset-date-group.svelte';
   import { stackAssets } from '$lib/utils/asset-utils';
-  import DeleteAssetDialog from './delete-asset-dialog.svelte';
+  import DeleteAssetDialog from '$lib/components/photos-page/delete-asset-dialog.svelte';
   import { handlePromiseError } from '$lib/utils';
   import { selectAllAssets } from '$lib/utils/asset-utils';
   import { navigate } from '$lib/utils/navigation';
@@ -93,6 +93,35 @@
     handlePromiseError(trashOrDelete(true));
   };
 
+  const handleArchive = (ids: string[]) => {
+    assetInteractionStore.clearMultiselect();
+    assetStore.removeAssets(ids);
+  };
+
+  const handleFavorite = (assets: AssetResponseDto[], isFavorite: boolean) => {
+    for (const asset of assets) {
+      asset.isFavorite = isFavorite;
+    }
+    assetInteractionStore.clearMultiselect();
+    assetStore.triggerUpdate();
+  };
+
+  const onArchive = async () => {
+    const assets = Array.from($selectedAssets);
+    const ids = assets.map((asset) => asset.id);
+    const numberOfArhived = assets.filter((asset) => asset.isArchived).length;
+    const toArchive = numberOfArhived < assets.length - numberOfArhived;
+    await archiveAssets(toArchive, () => handleArchive(ids), ids);
+  };
+
+  const onFavorite = async () => {
+    const assets = Array.from($selectedAssets);
+    const ids = assets.map((asset) => asset.id);
+    const numberOfFavorites = assets.filter((asset) => asset.isFavorite).length;
+    const toFavorite = numberOfFavorites < assets.length - numberOfFavorites;
+    await favoriteAssets(toFavorite, () => handleFavorite(assets, toFavorite), ids);
+  };
+
   const onStackAssets = async () => {
     const ids = await stackAssets(Array.from($selectedAssets));
     if (ids) {
@@ -117,6 +146,8 @@
 
     if ($isMultiSelectState) {
       shortcuts.push(
+        { shortcut: { key: 'a', shift: true }, onShortcut: onArchive },
+        { shortcut: { key: 'f' }, onShortcut: onFavorite },
         { shortcut: { key: 'Delete' }, onShortcut: onDelete },
         { shortcut: { key: 'Delete', shift: true }, onShortcut: onForceDelete },
         { shortcut: { key: 'D', ctrl: true }, onShortcut: () => deselectAllAssets() },

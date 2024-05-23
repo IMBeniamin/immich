@@ -1,5 +1,5 @@
 import { notificationController, NotificationType } from '$lib/components/shared-components/notification/notification';
-import { deleteAssets as deleteBulk, type AssetResponseDto } from '@immich/sdk';
+import { deleteAssets as deleteBulk, updateAssets, type AssetResponseDto } from '@immich/sdk';
 import { handleError } from './handle-error';
 
 export type OnDelete = (assetIds: string[]) => void;
@@ -20,5 +20,35 @@ export const deleteAssets = async (force: boolean, onAssetDelete: OnDelete, ids:
     });
   } catch (error) {
     handleError(error, 'Error deleting assets');
+  }
+};
+
+export const favoriteAssets = async (isFavorite: boolean, onAssetFavorite: OnFavorite, ids: string[]) => {
+  try {
+    await updateAssets({ assetBulkUpdateDto: { ids, isFavorite } });
+
+    onAssetFavorite(ids, isFavorite);
+
+    notificationController.show({
+      message: isFavorite ? `Added ${ids.length} to favorites` : `Removed ${ids.length} from favorites`,
+      type: NotificationType.Info,
+    });
+  } catch (error) {
+    handleError(error, `Unable to ${isFavorite ? 'add to' : 'remove from'} favorites`);
+  }
+};
+
+export const archiveAssets = async (isArchived: boolean, onAssetArchive: OnArchive, ids: string[]) => {
+  try {
+    await updateAssets({ assetBulkUpdateDto: { ids, isArchived } });
+
+    onAssetArchive(ids, isArchived);
+
+    notificationController.show({
+      message: `${isArchived ? 'Archived' : 'Unarchived'} ${ids.length}`,
+      type: NotificationType.Info,
+    });
+  } catch (error) {
+    handleError(error, `Unable to ${isArchived ? 'archive' : 'unarchive'}`);
   }
 };
